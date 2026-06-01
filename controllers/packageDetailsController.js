@@ -17,6 +17,7 @@ exports.createPackageDetails = async (req, res) => {
       citiesCovered,
       tags,
     } = req.body;
+    console.log(req.body);
 
     // CHECK PACKAGE EXISTS
     const [packageRows] = await db.query(
@@ -188,7 +189,7 @@ exports.getPackageDetailsById = async (req, res) => {
       LEFT JOIN packages p
       ON p.id = pd.package_id
 
-      WHERE pd.id = ?
+      WHERE pd.package_id = ?
     `;
 
     const [result] = await db.query(sql, [id]);
@@ -237,6 +238,7 @@ exports.getPackageDetailsById = async (req, res) => {
 exports.updatePackageDetails = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(id, "khjhh");
 
     const {
       package_id,
