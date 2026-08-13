@@ -9,6 +9,7 @@ const destinationRoutes = require("./routes/destinationRoutes");
 const packageRoutes = require("./routes/packageRoutes");
 const packageDetailsRoutes = require("./routes/packageDeatilsRoutes");
 const authRoutes = require("./routes/authRoutes");
+const heroSliderRoutes = require("./routes/heroSliderRoutes");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/heroSliders", heroSliderRoutes);
 
 app.use("/api/destinations", destinationRoutes);
 
