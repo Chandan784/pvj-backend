@@ -1,110 +1,153 @@
-const db = require("../config/db");
+const authService = require("../services/authServices");
 
-/* ======================================================
-   LOGIN
-====================================================== */
+async function sendSignupOtp(req, res) {
+    try {
+        const response =
+            await authService.sendSignupOtp(req.body);
 
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+        return res.status(200).json(response);
 
-    console.log(req.body);
-
-    /* VALIDATION */
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password required",
-      });
+    } catch (error) {
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.message,
+        });
     }
+}
 
-    /* CHECK USER */
 
-    const sql = "SELECT * FROM users WHERE email=? AND password=? LIMIT 1";
+async function verifySignupOtp(req, res) {
+    try {
+        const response =
+            await authService.verifySignupOtp(req.body);
 
-    const [result] = await db.query(sql, [email, password]);
+        return res.status(200).json(response);
 
-    /* USER NOT FOUND */
-
-    if (result.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
+    } catch (error) {
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.message,
+        });
     }
+}
 
-    const user = result[0];
 
-    /* RESPONSE */
+async function createPassword(req, res) {
+    try {
+        const response =
+            await authService.createPassword(req.body);
 
-    res.json({
-      success: true,
-      message: "Login successful",
-      user: {
-        id: user.id,
-        email: user.email,
-        type: user.type,
-      },
-    });
-  } catch (error) {
-    console.log(error);
+        return res.status(200).json(response);
 
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
-/* ======================================================
-   RESET PASSWORD
-====================================================== */
-
-exports.resetPassword = async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-
-    /* VALIDATION */
-
-    if (!email || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and new password required",
-      });
+    } catch (error) {
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.message,
+        });
     }
+}
 
-    /* CHECK USER */
 
-    const checkSql = "SELECT * FROM users WHERE email=? LIMIT 1";
+async function login(req, res) {
+    try {
+        const result =
+            await authService.login(req.body);
 
-    const [userResult] = await db.query(checkSql, [email]);
+        return res.status(200).json(result);
 
-    if (userResult.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+    } catch (error) {
+        console.error(
+            "LOGIN ERROR:",
+            error
+        );
+
+        return res.status(
+            error.status || 500
+        ).json({
+            success: false,
+            message:
+                error.message ||
+                "Login failed",
+        });
     }
+}
 
-    /* UPDATE PASSWORD */
 
-    const updateSql = "UPDATE users SET password=? WHERE email=?";
+async function forgotPassword(req, res) {
+    try {
+        const response =
+            await authService.forgotPassword(req.body);
 
-    await db.query(updateSql, [newPassword, email]);
+        return res.status(200).json(response);
 
-    /* RESPONSE */
+    } catch (error) {
+        return res.status(error.status || 500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+}
 
-    res.json({
-      success: true,
-      message: "Password reset successful",
-    });
-  } catch (error) {
-    console.log(error);
+async function resetPassword(req, res) {
+    try {
+        const result =
+            await authService.resetPassword(
+                req.body
+            );
 
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+        return res.status(200).json(result);
+
+    } catch (error) {
+        console.error(
+            "RESET PASSWORD ERROR:",
+            error
+        );
+
+        return res.status(
+            error.status || 500
+        ).json({
+            success: false,
+            message:
+                error.message ||
+                "Internal server error",
+        });
+    }
+}
+async function verifyResetOtp(req, res) {
+    try {
+        const result =
+            await authService.verifyResetOtp(
+                req.body
+            );
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+        console.error(
+            "VERIFY RESET OTP ERROR:",
+            error
+        );
+
+        return res.status(
+            error.status || 500
+        ).json({
+            success: false,
+            message:
+                error.message ||
+                "Internal server error",
+        });
+    }
+}
+
+
+
+
+module.exports = {
+    sendSignupOtp,
+    verifySignupOtp,
+    verifyResetOtp,
+    createPassword,
+    login,
+    forgotPassword,
+    resetPassword,
 };
