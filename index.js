@@ -25,8 +25,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://travdigit.applutetech.com",
-      "https://www.travdigit.applutetech.com",
+      "https://primevistajourney.com",
+      "https://www.primevistajourney.com",
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
