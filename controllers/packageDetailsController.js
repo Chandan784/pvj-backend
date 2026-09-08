@@ -1,8 +1,63 @@
 const db = require("../config/db");
 
 /* =========================================================
+   HELPER FUNCTIONS
+========================================================= */
+
+// Parse JSON safely
+const safeJSONParse = (value, defaultValue) => {
+  if (value === null || value === undefined || value === "") {
+    return defaultValue;
+  }
+
+  // Already parsed by MySQL JSON type
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (err) {
+    console.log("Invalid JSON:", value);
+
+    // If plain text like "Accommodation"
+    if (Array.isArray(defaultValue)) {
+      return [value];
+    }
+
+    return defaultValue;
+  }
+};
+
+// Convert any input to JSON string before saving
+const toJSONString = (value, defaultValue) => {
+  if (value === null || value === undefined || value === "") {
+    return JSON.stringify(defaultValue);
+  }
+
+  // Already array/object
+  if (typeof value !== "string") {
+    return JSON.stringify(value);
+  }
+
+  // Already valid JSON string
+  try {
+    JSON.parse(value);
+    return value;
+  } catch (err) {
+    // Plain string
+    if (Array.isArray(defaultValue)) {
+      return JSON.stringify([value]);
+    }
+
+    return JSON.stringify(defaultValue);
+  }
+};
+
+/* =========================================================
    CREATE PACKAGE DETAILS
 ========================================================= */
+
 exports.createPackageDetails = async (req, res) => {
   try {
     const {
@@ -17,35 +72,31 @@ exports.createPackageDetails = async (req, res) => {
       citiesCovered,
       tags,
     } = req.body;
-    console.log(req.body);
 
-    // CHECK PACKAGE EXISTS
     const [packageRows] = await db.query(
-      "SELECT * FROM packages WHERE id = ?",
-      [package_id],
+      "SELECT id FROM packages WHERE id = ?",
+      [package_id]
     );
 
-    if (packageRows.length === 0) {
+    if (!packageRows.length) {
       return res.status(404).json({
         success: false,
         message: "Package not found",
       });
     }
 
-    // CHECK DETAILS ALREADY EXISTS
     const [existing] = await db.query(
-      "SELECT * FROM package_details WHERE package_id = ?",
-      [package_id],
+      "SELECT id FROM package_details WHERE package_id = ?",
+      [package_id]
     );
 
-    if (existing.length > 0) {
+    if (existing.length) {
       return res.status(400).json({
         success: false,
-        message: "Package details already added",
+        message: "Package details already exist",
       });
     }
 
-    // INSERT
     const sql = `
       INSERT INTO package_details
       (
@@ -65,18 +116,18 @@ exports.createPackageDetails = async (req, res) => {
 
     const [result] = await db.query(sql, [
       package_id,
-      overview,
-      JSON.stringify(inclusions || []),
-      JSON.stringify(exclusions || []),
-      JSON.stringify(itinerary || []),
-      JSON.stringify(keyInfo || {}),
-      JSON.stringify(termsAndConditions || []),
-      JSON.stringify(highlights || []),
-      JSON.stringify(citiesCovered || []),
-      JSON.stringify(tags || []),
+      overview || "",
+      toJSONString(inclusions, []),
+      toJSONString(exclusions, []),
+      toJSONString(itinerary, []),
+      toJSONString(keyInfo, []),
+      toJSONString(termsAndConditions, []),
+      toJSONString(highlights, []),
+      toJSONString(citiesCovered, []),
+      toJSONString(tags, []),
     ]);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Package details created successfully",
       id: result.insertId,
@@ -84,7 +135,7 @@ exports.createPackageDetails = async (req, res) => {
   } catch (error) {
     console.log(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -94,13 +145,13 @@ exports.createPackageDetails = async (req, res) => {
 /* =========================================================
    GET ALL PACKAGE DETAILS
 ========================================================= */
+
 exports.getPackageDetails = async (req, res) => {
   try {
     const sql = `
-      SELECT 
+      SELECT
         pd.*,
-
-        p.id as package_db_id,
+        p.id AS package_db_id,
         p.packageId,
         p.destination_id,
         p.title,
@@ -115,42 +166,35 @@ exports.getPackageDetails = async (req, res) => {
         p.originalPrice,
         p.currency,
         p.perText
-
       FROM package_details pd
-
       LEFT JOIN packages p
       ON p.id = pd.package_id
-
       ORDER BY pd.id DESC
     `;
 
-    const [result] = await db.query(sql);
+    const [rows] = await db.query(sql);
 
-    const formatted = result.map((item) => ({
+    const formatted = rows.map((item) => ({
       ...item,
-
-      inclusions: JSON.parse(item.inclusions || "[]"),
-
-      exclusions: JSON.parse(item.exclusions || "[]"),
-
-      itinerary: JSON.parse(item.itinerary || "[]"),
-
-      keyInfo: JSON.parse(item.keyInfo || "{}"),
-
-      termsAndConditions: JSON.parse(item.termsAndConditions || "[]"),
-
-      highlights: JSON.parse(item.highlights || "[]"),
-
-      citiesCovered: JSON.parse(item.citiesCovered || "[]"),
-
-      tags: JSON.parse(item.tags || "[]"),
+      inclusions: safeJSONParse(item.inclusions, []),
+      exclusions: safeJSONParse(item.exclusions, []),
+      itinerary: safeJSONParse(item.itinerary, []),
+      keyInfo: safeJSONParse(item.keyInfo, []),
+      termsAndConditions: safeJSONParse(item.termsAndConditions, []),
+      highlights: safeJSONParse(item.highlights, []),
+      citiesCovered: safeJSONParse(item.citiesCovered, []),
+      tags: safeJSONParse(item.tags, []),
     }));
 
-    res.json(formatted);
+    return res.status(200).json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
   } catch (error) {
     console.log(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -160,15 +204,15 @@ exports.getPackageDetails = async (req, res) => {
 /* =========================================================
    GET SINGLE PACKAGE DETAILS
 ========================================================= */
+
 exports.getPackageDetailsById = async (req, res) => {
   try {
     const { id } = req.params;
 
     const sql = `
-      SELECT 
+      SELECT
         pd.*,
-
-        p.id as package_db_id,
+        p.id AS package_db_id,
         p.packageId,
         p.destination_id,
         p.title,
@@ -183,49 +227,42 @@ exports.getPackageDetailsById = async (req, res) => {
         p.originalPrice,
         p.currency,
         p.perText
-
       FROM package_details pd
-
       LEFT JOIN packages p
       ON p.id = pd.package_id
-
       WHERE pd.package_id = ?
+      LIMIT 1
     `;
 
-    const [result] = await db.query(sql, [id]);
+    const [rows] = await db.query(sql, [id]);
 
-    if (result.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
         message: "Package details not found",
       });
     }
 
-    const item = result[0];
+    const item = rows[0];
 
-    res.json({
-      ...item,
-
-      inclusions: JSON.parse(item.inclusions || "[]"),
-
-      exclusions: JSON.parse(item.exclusions || "[]"),
-
-      itinerary: JSON.parse(item.itinerary || "[]"),
-
-      keyInfo: JSON.parse(item.keyInfo || "{}"),
-
-      termsAndConditions: JSON.parse(item.termsAndConditions || "[]"),
-
-      highlights: JSON.parse(item.highlights || "[]"),
-
-      citiesCovered: JSON.parse(item.citiesCovered || "[]"),
-
-      tags: JSON.parse(item.tags || "[]"),
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...item,
+        inclusions: safeJSONParse(item.inclusions, []),
+        exclusions: safeJSONParse(item.exclusions, []),
+        itinerary: safeJSONParse(item.itinerary, []),
+        keyInfo: safeJSONParse(item.keyInfo, []),
+        termsAndConditions: safeJSONParse(item.termsAndConditions, []),
+        highlights: safeJSONParse(item.highlights, []),
+        citiesCovered: safeJSONParse(item.citiesCovered, []),
+        tags: safeJSONParse(item.tags, []),
+      },
     });
   } catch (error) {
     console.log(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -235,10 +272,10 @@ exports.getPackageDetailsById = async (req, res) => {
 /* =========================================================
    UPDATE PACKAGE DETAILS
 ========================================================= */
+
 exports.updatePackageDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(id, "khjhh");
 
     const {
       package_id,
@@ -253,58 +290,57 @@ exports.updatePackageDetails = async (req, res) => {
       tags,
     } = req.body;
 
-    // CHECK EXISTS
     const [rows] = await db.query(
-      "SELECT * FROM package_details WHERE id = ?",
-      [id],
+      "SELECT id FROM package_details WHERE id = ?",
+      [id]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
         message: "Package details not found",
       });
     }
 
-    // UPDATE
     const sql = `
       UPDATE package_details
       SET
-        package_id=?,
-        overview=?,
-        inclusions=?,
-        exclusions=?,
-        itinerary=?,
-        keyInfo=?,
-        termsAndConditions=?,
-        highlights=?,
-        citiesCovered=?,
-        tags=?
-      WHERE id=?
+        package_id = ?,
+        overview = ?,
+        inclusions = ?,
+        exclusions = ?,
+        itinerary = ?,
+        keyInfo = ?,
+        termsAndConditions = ?,
+        highlights = ?,
+        citiesCovered = ?,
+        tags = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
     `;
 
     await db.query(sql, [
       package_id,
-      overview,
-      JSON.stringify(inclusions || []),
-      JSON.stringify(exclusions || []),
-      JSON.stringify(itinerary || []),
-      JSON.stringify(keyInfo || {}),
-      JSON.stringify(termsAndConditions || []),
-      JSON.stringify(highlights || []),
-      JSON.stringify(citiesCovered || []),
-      JSON.stringify(tags || []),
+      overview || "",
+      toJSONString(inclusions, []),
+      toJSONString(exclusions, []),
+      toJSONString(itinerary, []),
+      toJSONString(keyInfo, []),
+      toJSONString(termsAndConditions, []),
+      toJSONString(highlights, []),
+      toJSONString(citiesCovered, []),
+      toJSONString(tags, []),
       id,
     ]);
 
-    res.json({
+    return res.status(200).json({
       success: true,
       message: "Package details updated successfully",
     });
   } catch (error) {
     console.log(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -314,34 +350,33 @@ exports.updatePackageDetails = async (req, res) => {
 /* =========================================================
    DELETE PACKAGE DETAILS
 ========================================================= */
+
 exports.deletePackageDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // CHECK EXISTS
     const [rows] = await db.query(
-      "SELECT * FROM package_details WHERE id = ?",
-      [id],
+      "SELECT id FROM package_details WHERE id = ?",
+      [id]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
       return res.status(404).json({
         success: false,
         message: "Package details not found",
       });
     }
 
-    // DELETE
     await db.query("DELETE FROM package_details WHERE id = ?", [id]);
 
-    res.json({
+    return res.status(200).json({
       success: true,
       message: "Package details deleted successfully",
     });
   } catch (error) {
     console.log(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
